@@ -23,6 +23,7 @@ jobs:
       - name: Install Arduino libraries
         run: |
           arduino-cli lib install "ArduinoJson"
+          arduino-cli lib install "PubSubClient"
 
       - name: Install ESP8266 core
         run: |

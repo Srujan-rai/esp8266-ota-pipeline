@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="ESP8266 OTA Pipeline">
+    <mxGraphModel dx="1206" dy="756" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- ESP8266 -->
+        <mxCell id="esp" value="ESP8266\nWiFi + MQTT\nOTA Client" style="shape=ellipse;fillColor=#FFCC00;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="120" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- MQTT Broker -->
+        <mxCell id="mqtt" value="MQTT Broker" style="shape=ellipse;fillColor=#66CCFF;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="250" y="100" width="120" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- mqtt2prometheus -->
+        <mxCell id="mqtt2prom" value="mqtt2prometheus\nMQTT → Prometheus" style="shape=rectangle;fillColor=#99FF99;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="450" y="100" width="140" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Prometheus -->
+        <mxCell id="prometheus" value="Prometheus\nScrapes metrics" style="shape=rectangle;fillColor=#FF9999;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="650" y="100" width="120" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Grafana -->
+        <mxCell id="grafana" value="Grafana\nVisualizes metrics" style="shape=rectangle;fillColor=#CC99FF;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="850" y="100" width="140" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- GitHub Actions -->
+        <mxCell id="gha" value="GitHub Actions\nBuild & Deploy OTA" style="shape=rectangle;fillColor=#FF9966;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="250" y="300" width="140" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- GitHub Pages -->
+        <mxCell id="ghpages" value="GitHub Pages\nHosts firmware & ota.json" style="shape=rectangle;fillColor=#66FFCC;fontSize=12;fontColor=#000000;strokeColor=#000000" vertex="1" parent="1">
+          <mxGeometry x="450" y="300" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Connections -->
+        <mxCell id="conn1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="esp" target="mqtt" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="conn2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="mqtt" target="mqtt2prom" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="conn3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="mqtt2prom" target="prometheus" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="conn4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="prometheus" target="grafana" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="conn5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="gha" target="ghpages" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="conn6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;endArrow=block" edge="1" source="ghpages" target="esp" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
