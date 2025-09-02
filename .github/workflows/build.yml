@@ -36,8 +36,9 @@ jobs:
         run: |
           arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
-            --build-property build.extra_flags="-DFW_VERSION=\\\"${{ github.run_number }}\\\"" \
+            --build-property build.extra_flags='-DFW_VERSION="${{ github.run_number }}"' \
             firmware/firmware.ino --output-dir build
+
 
       - name: Prepare OTA files
         run: |
