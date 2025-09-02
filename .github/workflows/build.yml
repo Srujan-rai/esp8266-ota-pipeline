@@ -14,6 +14,13 @@ jobs:
 
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@v1
+      
+      - name: Install Arduino libraries
+        run: |
+          arduino-cli lib install "ArduinoJson"
+          arduino-cli lib install "ESP8266HTTPClient"
+          arduino-cli lib install "ESP8266WiFi"
+
 
       - name: Install ESP8266 core
         run: |
