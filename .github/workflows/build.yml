@@ -1,0 +1,38 @@
+name: Build and Deploy OTA
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      - name: Install ESP8266 core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install esp8266:esp8266
+
+      - name: Compile firmware
+        run: |
+          arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/main.ino
+          mkdir -p ota
+          cp firmware/build/esp8266.esp8266.nodemcuv2/main.ino.bin ota/firmware-${{ github.run_number }}.bin
+
+      - name: Update ota.json
+        run: |
+          VERSION="${{ github.run_number }}"
+          echo "{ \"version\": \"$VERSION\", \"url\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/firmware-$VERSION.bin\" }" > ota/ota.json
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ota
