@@ -6,19 +6,21 @@
 
 // ================= USER CONFIG =================
 #ifndef FW_VERSION
-#define FW_VERSION "v1.0.0"
+#define FW_VERSION "v1.0.0" // fallback if not injected by build pipeline
 #endif
 
 const char *WIFI_SSID = "Airtel_Srujan";
 const char *WIFI_PASS = "raisrujan@2003S";
 
+// OTA metadata hosted on GitHub Pages
+const char *OTA_META_URL =
+    "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
+
+// MQTT broker (optional monitoring)
 const char *MQTT_BROKER = "192.168.1.5";
 const int MQTT_PORT = 1883;
 const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
-
-const char *OTA_META_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
-
 // =================================================
 
 String currentVersion = FW_VERSION;
@@ -26,9 +28,7 @@ WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
-const unsigned long CHECK_INTERVAL = 60UL * 1000UL;
-
-bool otaBootSuccess = false;
+const unsigned long CHECK_INTERVAL = 60UL * 1000UL; // 1 minute
 
 // --- WiFi & MQTT ---
 void connectWiFi()
@@ -74,26 +74,6 @@ void publishMetrics()
     mqttClient.publish(MQTT_TOPIC, payload);
 }
 
-// --- Rollback Check ---
-void checkRollback()
-{
-    if (!otaBootSuccess)
-    {
-        Serial.println("Previous OTA failed, rolling back...");
-        t_httpUpdate_return ret = ESPhttpUpdate.update(
-            wifiClient,
-            "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin");
-        if (ret == HTTP_UPDATE_OK)
-        {
-            Serial.println("Rollback successful, rebooting...");
-        }
-        else
-        {
-            Serial.println("Rollback failed or no previous firmware!");
-        }
-    }
-}
-
 // --- OTA Update ---
 void checkForUpdate()
 {
@@ -104,9 +84,9 @@ void checkForUpdate()
     if (WiFi.status() != WL_CONNECTED)
         return;
 
-    WiFiClient client;
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure(); // skip certificate check
     HTTPClient http;
-
     if (!http.begin(client, OTA_META_URL))
     {
         Serial.println("HTTP begin failed");
@@ -164,7 +144,6 @@ void checkForUpdate()
 
     case HTTP_UPDATE_OK:
         Serial.println("OTA OK -> rebooting...");
-        otaBootSuccess = true;
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":1}");
         break;
     }
@@ -178,8 +157,6 @@ void setup()
     lastCheck = millis();
 
     Serial.printf("Booting firmware version: %s\n", currentVersion.c_str());
-
-    checkRollback();
 }
 
 void loop()
