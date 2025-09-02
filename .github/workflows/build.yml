@@ -28,11 +28,14 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp8266:esp8266
 
-      - name: Compile firmware
+      - name: Compile sketch
         run: |
           arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/firmware.ino --output-dir build
+
+      - name: Copy firmware binary
+        run: |
           mkdir -p ota
-          cp build/esp8266.esp8266.nodemcuv2/firmware.ino.bin ota/firmware-${{ github.run_number }}.bin
+          cp build/firmware.ino.bin ota/firmware.bin
 
       - name: Update ota.json
         run: |
