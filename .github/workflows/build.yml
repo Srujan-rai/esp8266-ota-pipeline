@@ -24,9 +24,9 @@ jobs:
 
       - name: Compile firmware
         run: |
-          arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/main.ino
+          arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/firmware.ino --output-dir build
           mkdir -p ota
-          cp firmware/build/esp8266.esp8266.nodemcuv2/main.ino.bin ota/firmware-${{ github.run_number }}.bin
+          cp build/esp8266.esp8266.nodemcuv2/firmware.ino.bin ota/firmware-${{ github.run_number }}.bin
 
       - name: Update ota.json
         run: |
