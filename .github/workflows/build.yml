@@ -33,14 +33,23 @@ jobs:
 
       - name: Compile sketch
         run: |
-          arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/firmware.ino --output-dir build
+          arduino-cli compile \
+            --fqbn esp8266:esp8266:nodemcuv2 \
+            --build-property build.extra_flags="-DFW_VERSION=\\\"${{ github.run_number }}\\\"" \
+            firmware/firmware.ino --output-dir build
 
       - name: Prepare OTA files
         run: |
           VERSION="${{ github.run_number }}"
           mkdir -p ota
-          cp build/firmware.ino.bin ota/firmware-$VERSION.bin
-          echo "{ \"version\": \"$VERSION\", \"url\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/firmware-$VERSION.bin\" }" > ota/ota.json
+          # If old latest exists, move it to prev
+          if [ -f ota/firmware-latest.bin ]; then
+            mv ota/firmware-latest.bin ota/firmware-prev.bin
+          fi
+          # Copy new build as latest
+          cp build/firmware.ino.bin ota/firmware-latest.bin
+          # Update metadata
+          echo "{ \"version\": \"$VERSION\", \"url\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/firmware-latest.bin\" }" > ota/ota.json
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
