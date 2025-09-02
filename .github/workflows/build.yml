@@ -9,7 +9,6 @@ permissions:
   pages: write
   id-token: write
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,12 +19,10 @@ jobs:
 
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@v1
-      
+
       - name: Install Arduino libraries
         run: |
           arduino-cli lib install "ArduinoJson"
-          
-
 
       - name: Install ESP8266 core
         run: |
@@ -38,14 +35,11 @@ jobs:
         run: |
           arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 firmware/firmware.ino --output-dir build
 
-      - name: Copy firmware binary
-        run: |
-          mkdir -p ota
-          cp build/firmware.ino.bin ota/firmware.bin
-
-      - name: Update ota.json
+      - name: Prepare OTA files
         run: |
           VERSION="${{ github.run_number }}"
+          mkdir -p ota
+          cp build/firmware.ino.bin ota/firmware-$VERSION.bin
           echo "{ \"version\": \"$VERSION\", \"url\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/firmware-$VERSION.bin\" }" > ota/ota.json
 
       - name: Deploy to GitHub Pages
