@@ -18,8 +18,7 @@ jobs:
       - name: Install Arduino libraries
         run: |
           arduino-cli lib install "ArduinoJson"
-          arduino-cli lib install "ESP8266HTTPClient"
-          arduino-cli lib install "ESP8266WiFi"
+          
 
 
       - name: Install ESP8266 core
