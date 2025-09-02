@@ -44,10 +44,11 @@ jobs:
           VERSION="${{ github.run_number }}"
           mkdir -p ota
 
-          # Move latest to prev if it exists
-          if [ -f ota/firmware-latest.bin ]; then
-            mv ota/firmware-latest.bin ota/firmware-prev.bin
-          fi
+          # Pull existing gh-pages branch to get previous firmware
+          git fetch origin gh-pages
+          git checkout -b gh-pages origin/gh-pages || true
+          cp firmware-latest.bin ota/firmware-prev.bin 2>/dev/null || true
+          git checkout main
 
           # Copy new build as latest
           cp build/firmware.ino.bin ota/firmware-latest.bin
