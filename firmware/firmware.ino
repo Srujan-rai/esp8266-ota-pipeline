@@ -4,7 +4,7 @@
 #include <ESP8266httpUpdate.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <user_interface.h> // for RTC memory
+#include <EEPROM.h>
 
 // ================= USER CONFIG =================
 #ifndef FW_VERSION
@@ -20,38 +20,39 @@ const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
 
 const char *OTA_META_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
+const char *ROLLBACK_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
 
-// =================================================
+// ================= BOOT FLAG (EEPROM) =================
+#define EEPROM_SIZE 4
+#define EEPROM_ADDR 0
+
+#define BOOT_FLAG_OK 0xAA
+#define BOOT_FLAG_FAIL 0x55
 
 String currentVersion = FW_VERSION;
 
-WiFiClientSecure secureClient; // for HTTPS OTA
-WiFiClient wifiClient;         // for MQTT
+WiFiClientSecure secureClient; // HTTPS for OTA
+WiFiClient wifiClient;         // plain TCP for MQTT
 PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
-const unsigned long CHECK_INTERVAL = 60UL * 1000UL;
+const unsigned long CHECK_INTERVAL = 60UL * 1000UL; // 1 min
 
-// --- RTC storage for OTA success ---
-struct
+// --- EEPROM helpers ---
+void eepromWriteBootFlag(uint8_t flag)
 {
-    uint32_t marker;
-    bool otaSuccess;
-} rtcData;
-
-void markOtaSuccess(bool success)
-{
-    rtcData.marker = 0xCAFEBABE;
-    rtcData.otaSuccess = success;
-    system_rtc_mem_write(65, &rtcData, sizeof(rtcData)); // slot 65
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.write(EEPROM_ADDR, flag);
+    EEPROM.commit();
+    EEPROM.end();
 }
 
-bool readOtaSuccess()
+uint8_t eepromReadBootFlag()
 {
-    system_rtc_mem_read(65, &rtcData, sizeof(rtcData));
-    if (rtcData.marker != 0xCAFEBABE)
-        return false; // not set yet
-    return rtcData.otaSuccess;
+    EEPROM.begin(EEPROM_SIZE);
+    uint8_t val = EEPROM.read(EEPROM_ADDR);
+    EEPROM.end();
+    return val;
 }
 
 // --- WiFi & MQTT ---
@@ -98,24 +99,27 @@ void publishMetrics()
     mqttClient.publish(MQTT_TOPIC, payload);
 }
 
-// --- Rollback Check ---
-void checkRollback()
+// --- Rollback ---
+void performRollback()
 {
-    Serial.println("Previous OTA failed, rolling back...");
-
+    Serial.println("[ROLLBACK] Attempting rollback to previous firmware...");
     secureClient.setInsecure();
-    const char *rollbackUrl = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
+    Serial.printf("[ROLLBACK] Download URL: %s\n", ROLLBACK_URL);
 
-    t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, rollbackUrl);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, ROLLBACK_URL);
+
     if (ret == HTTP_UPDATE_OK)
     {
-        Serial.println("Rollback successful, rebooting...");
+        Serial.println("[ROLLBACK] Rollback flashed OK. Marking success.");
+        eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ prevent rollback loop
     }
     else
     {
-        Serial.printf("Rollback failed! Error (%d): %s\n",
-                      ESPhttpUpdate.getLastError(),
-                      ESPhttpUpdate.getLastErrorString().c_str());
+        int err = ESPhttpUpdate.getLastError();
+        const String errStr = ESPhttpUpdate.getLastErrorString();
+        Serial.printf("[ROLLBACK] Rollback failed (err=%d): %s\n", err, errStr.c_str());
+        // leave FAIL flag → will retry rollback next boot
+        delay(3000);
     }
 }
 
@@ -178,6 +182,7 @@ void checkForUpdate()
     Serial.printf("New firmware %s found at %s\n", version, binUrl);
 
     secureClient.setInsecure();
+    eepromWriteBootFlag(BOOT_FLAG_FAIL); // mark fail BEFORE OTA
     t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, binUrl);
 
     switch (ret)
@@ -187,7 +192,7 @@ void checkForUpdate()
                       ESPhttpUpdate.getLastError(),
                       ESPhttpUpdate.getLastErrorString().c_str());
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":0}");
-        markOtaSuccess(false);
+        eepromWriteBootFlag(BOOT_FLAG_FAIL);
         break;
 
     case HTTP_UPDATE_NO_UPDATES:
@@ -196,7 +201,7 @@ void checkForUpdate()
 
     case HTTP_UPDATE_OK:
         Serial.println("OTA OK -> rebooting...");
-        markOtaSuccess(true);
+        eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ success
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":1}");
         break;
     }
@@ -210,17 +215,19 @@ void setup()
     connectMQTT();
     lastCheck = millis();
 
-    bool lastBootOk = readOtaSuccess();
-    Serial.printf("Booting firmware version: %s (lastBootOk=%d)\n",
-                  currentVersion.c_str(), lastBootOk);
+    uint8_t bootFlag = eepromReadBootFlag();
+    Serial.printf("Booting firmware version: %s (bootFlag=0x%02X)\n",
+                  currentVersion.c_str(), bootFlag);
 
-    if (!lastBootOk)
+    if (bootFlag == BOOT_FLAG_FAIL)
     {
-        checkRollback();
+        performRollback();
     }
-
-    // Mark this boot as good unless proven otherwise
-    markOtaSuccess(true);
+    else
+    {
+        // Fresh boot is considered successful
+        eepromWriteBootFlag(BOOT_FLAG_OK);
+    }
 }
 
 void loop()
@@ -230,7 +237,9 @@ void loop()
     if (!mqttClient.connected())
         connectMQTT();
     mqttClient.loop();
+
     publishMetrics();
     checkForUpdate();
+
     delay(5000);
 }
