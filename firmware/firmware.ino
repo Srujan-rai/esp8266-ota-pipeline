@@ -71,7 +71,7 @@ void publishMetrics()
     unsigned long uptime = millis() / 1000;
     uint32_t freeHeap = ESP.getFreeHeap();
     long rssi = WiFi.RSSI();
-    char payload[128];
+    char payload[160];
     snprintf(payload, sizeof(payload),
              "{\"uptime\":%lu,\"free_heap\":%u,\"wifi_rssi\":%ld,\"fw_version\":\"%s\"}",
              uptime, freeHeap, rssi, currentVersion.c_str());
@@ -84,17 +84,23 @@ void checkRollback()
     if (!otaBootSuccess)
     {
         Serial.println("Previous OTA failed, rolling back...");
-        // use secure client for rollback too
-        t_httpUpdate_return ret = ESPhttpUpdate.update(
-            secureClient,
-            "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin");
+
+        // set insecure again (needed if reset happened)
+        secureClient.setInsecure();
+
+        // rollback URL
+        const char *rollbackUrl = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
+
+        t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, rollbackUrl);
         if (ret == HTTP_UPDATE_OK)
         {
             Serial.println("Rollback successful, rebooting...");
         }
         else
         {
-            Serial.println("Rollback failed or no previous firmware!");
+            Serial.printf("Rollback failed! Error (%d): %s\n",
+                          ESPhttpUpdate.getLastError(),
+                          ESPhttpUpdate.getLastErrorString().c_str());
         }
     }
 }
@@ -110,12 +116,17 @@ void checkForUpdate()
 
     HTTPClient http;
 
-    // use secure client and skip certificate verification
+    // trust all certs
+    secureClient.setInsecure();
+
     if (!http.begin(secureClient, OTA_META_URL))
     {
         Serial.println("HTTP begin failed");
         return;
     }
+
+    // Follow GitHub Pages redirects
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK)
@@ -127,6 +138,9 @@ void checkForUpdate()
 
     String body = http.getString();
     http.end();
+
+    Serial.println("Received OTA metadata:");
+    Serial.println(body);
 
     StaticJsonDocument<512> doc;
     if (deserializeJson(doc, body))
@@ -152,7 +166,9 @@ void checkForUpdate()
 
     Serial.printf("New firmware %s found at %s\n", version, binUrl);
 
+    secureClient.setInsecure();
     t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, binUrl);
+
     switch (ret)
     {
     case HTTP_UPDATE_FAILED:
