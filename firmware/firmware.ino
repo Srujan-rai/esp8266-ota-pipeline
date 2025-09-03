@@ -230,7 +230,6 @@ void loop()
     if (!mqttClient.connected())
         connectMQTT();
     mqttClient.loop();
-
     publishMetrics();
     checkForUpdate();
     delay(5000);
