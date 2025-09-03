@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include <PubSubClient.h>
@@ -17,12 +18,15 @@ const int MQTT_PORT = 1883;
 const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
 
+// use HTTPS now that we're using WiFiClientSecure
 const char *OTA_META_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
 
 // =================================================
 
 String currentVersion = FW_VERSION;
-WiFiClient wifiClient;
+
+WiFiClientSecure secureClient; // global secure client
+WiFiClient wifiClient;         // for MQTT (plain TCP)
 PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
@@ -80,8 +84,9 @@ void checkRollback()
     if (!otaBootSuccess)
     {
         Serial.println("Previous OTA failed, rolling back...");
+        // use secure client for rollback too
         t_httpUpdate_return ret = ESPhttpUpdate.update(
-            wifiClient,
+            secureClient,
             "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin");
         if (ret == HTTP_UPDATE_OK)
         {
@@ -103,10 +108,10 @@ void checkForUpdate()
     if (WiFi.status() != WL_CONNECTED)
         return;
 
-    WiFiClient client;
     HTTPClient http;
 
-    if (!http.begin(client, OTA_META_URL))
+    // use secure client and skip certificate verification
+    if (!http.begin(secureClient, OTA_META_URL))
     {
         Serial.println("HTTP begin failed");
         return;
@@ -147,7 +152,7 @@ void checkForUpdate()
 
     Serial.printf("New firmware %s found at %s\n", version, binUrl);
 
-    t_httpUpdate_return ret = ESPhttpUpdate.update(client, binUrl);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, binUrl);
     switch (ret)
     {
     case HTTP_UPDATE_FAILED:
@@ -177,6 +182,9 @@ void setup()
     lastCheck = millis();
 
     Serial.printf("Booting firmware version: %s\n", currentVersion.c_str());
+
+    // trust all certs (⚠ insecure, for testing only!)
+    secureClient.setInsecure();
 
     checkRollback();
 }
