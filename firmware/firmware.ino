@@ -43,16 +43,13 @@ void eepromWriteBootFlag(uint8_t flag)
 {
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.write(EEPROM_ADDR, flag);
-    EEPROM.commit();
-    EEPROM.end();
+    EEPROM.commit(); // save to flash
 }
 
 uint8_t eepromReadBootFlag()
 {
     EEPROM.begin(EEPROM_SIZE);
-    uint8_t val = EEPROM.read(EEPROM_ADDR);
-    EEPROM.end();
-    return val;
+    return EEPROM.read(EEPROM_ADDR);
 }
 
 // --- WiFi & MQTT ---
@@ -110,8 +107,9 @@ void performRollback()
 
     if (ret == HTTP_UPDATE_OK)
     {
-        Serial.println("[ROLLBACK] Rollback flashed OK. Marking success.");
+        Serial.println("[ROLLBACK] Rollback flashed OK. Marking success and rebooting...");
         eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ prevent rollback loop
+        ESP.restart();                     // 🔄 ensure reboot into rollback firmware
     }
     else
     {
@@ -240,5 +238,6 @@ void loop()
 
     publishMetrics();
     checkForUpdate();
+
     delay(5000);
 }
