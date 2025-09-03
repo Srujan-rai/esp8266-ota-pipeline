@@ -94,7 +94,6 @@ void checkRollback()
     }
 }
 
-// --- OTA Update ---
 void checkForUpdate()
 {
     if (millis() - lastCheck < CHECK_INTERVAL)
