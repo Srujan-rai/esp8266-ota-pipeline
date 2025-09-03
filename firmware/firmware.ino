@@ -4,6 +4,7 @@
 #include <ESP8266httpUpdate.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <user_interface.h> // for RTC memory
 
 // ================= USER CONFIG =================
 #ifndef FW_VERSION
@@ -18,21 +19,40 @@ const int MQTT_PORT = 1883;
 const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
 
-// use HTTPS now that we're using WiFiClientSecure
 const char *OTA_META_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
 
 // =================================================
 
 String currentVersion = FW_VERSION;
 
-WiFiClientSecure secureClient; // global secure client
-WiFiClient wifiClient;         // for MQTT (plain TCP)
+WiFiClientSecure secureClient; // for HTTPS OTA
+WiFiClient wifiClient;         // for MQTT
 PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
 const unsigned long CHECK_INTERVAL = 60UL * 1000UL;
 
-bool otaBootSuccess = false;
+// --- RTC storage for OTA success ---
+struct
+{
+    uint32_t marker;
+    bool otaSuccess;
+} rtcData;
+
+void markOtaSuccess(bool success)
+{
+    rtcData.marker = 0xCAFEBABE;
+    rtcData.otaSuccess = success;
+    system_rtc_mem_write(65, &rtcData, sizeof(rtcData)); // slot 65
+}
+
+bool readOtaSuccess()
+{
+    system_rtc_mem_read(65, &rtcData, sizeof(rtcData));
+    if (rtcData.marker != 0xCAFEBABE)
+        return false; // not set yet
+    return rtcData.otaSuccess;
+}
 
 // --- WiFi & MQTT ---
 void connectWiFi()
@@ -81,30 +101,25 @@ void publishMetrics()
 // --- Rollback Check ---
 void checkRollback()
 {
-    if (!otaBootSuccess)
+    Serial.println("Previous OTA failed, rolling back...");
+
+    secureClient.setInsecure();
+    const char *rollbackUrl = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, rollbackUrl);
+    if (ret == HTTP_UPDATE_OK)
     {
-        Serial.println("Previous OTA failed, rolling back...");
-
-        // set insecure again (needed if reset happened)
-        secureClient.setInsecure();
-
-        // rollback URL
-        const char *rollbackUrl = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
-
-        t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, rollbackUrl);
-        if (ret == HTTP_UPDATE_OK)
-        {
-            Serial.println("Rollback successful, rebooting...");
-        }
-        else
-        {
-            Serial.printf("Rollback failed! Error (%d): %s\n",
-                          ESPhttpUpdate.getLastError(),
-                          ESPhttpUpdate.getLastErrorString().c_str());
-        }
+        Serial.println("Rollback successful, rebooting...");
+    }
+    else
+    {
+        Serial.printf("Rollback failed! Error (%d): %s\n",
+                      ESPhttpUpdate.getLastError(),
+                      ESPhttpUpdate.getLastErrorString().c_str());
     }
 }
 
+// --- OTA Check ---
 void checkForUpdate()
 {
     if (millis() - lastCheck < CHECK_INTERVAL)
@@ -115,8 +130,6 @@ void checkForUpdate()
         return;
 
     HTTPClient http;
-
-    // trust all certs
     secureClient.setInsecure();
 
     if (!http.begin(secureClient, OTA_META_URL))
@@ -125,9 +138,7 @@ void checkForUpdate()
         return;
     }
 
-    // Follow GitHub Pages redirects
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK)
     {
@@ -176,6 +187,7 @@ void checkForUpdate()
                       ESPhttpUpdate.getLastError(),
                       ESPhttpUpdate.getLastErrorString().c_str());
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":0}");
+        markOtaSuccess(false);
         break;
 
     case HTTP_UPDATE_NO_UPDATES:
@@ -184,12 +196,13 @@ void checkForUpdate()
 
     case HTTP_UPDATE_OK:
         Serial.println("OTA OK -> rebooting...");
-        otaBootSuccess = true;
+        markOtaSuccess(true);
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":1}");
         break;
     }
 }
 
+// --- Setup & Loop ---
 void setup()
 {
     Serial.begin(115200);
@@ -197,12 +210,17 @@ void setup()
     connectMQTT();
     lastCheck = millis();
 
-    Serial.printf("Booting firmware version: %s\n", currentVersion.c_str());
+    bool lastBootOk = readOtaSuccess();
+    Serial.printf("Booting firmware version: %s (lastBootOk=%d)\n",
+                  currentVersion.c_str(), lastBootOk);
 
-    // trust all certs (⚠ insecure, for testing only!)
-    secureClient.setInsecure();
+    if (!lastBootOk)
+    {
+        checkRollback();
+    }
 
-    checkRollback();
+    // Mark this boot as good unless proven otherwise
+    markOtaSuccess(true);
 }
 
 void loop()
@@ -215,5 +233,6 @@ void loop()
 
     publishMetrics();
     checkForUpdate();
+
     delay(5000);
 }
