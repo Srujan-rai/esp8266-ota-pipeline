@@ -233,6 +233,5 @@ void loop()
 
     publishMetrics();
     checkForUpdate();
-
     delay(5000);
 }
