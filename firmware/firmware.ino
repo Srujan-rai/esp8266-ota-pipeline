@@ -37,19 +37,24 @@ PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
 const unsigned long CHECK_INTERVAL = 60UL * 1000UL; // 1 min
+unsigned long bootTime = 0;
+bool bootConfirmed = false;
 
 // --- EEPROM helpers ---
 void eepromWriteBootFlag(uint8_t flag)
 {
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.write(EEPROM_ADDR, flag);
-    EEPROM.commit(); // save to flash
+    EEPROM.commit();
+    EEPROM.end();
 }
 
 uint8_t eepromReadBootFlag()
 {
     EEPROM.begin(EEPROM_SIZE);
-    return EEPROM.read(EEPROM_ADDR);
+    uint8_t val = EEPROM.read(EEPROM_ADDR);
+    EEPROM.end();
+    return val;
 }
 
 // --- WiFi & MQTT ---
@@ -59,18 +64,26 @@ void connectWiFi()
         return;
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     Serial.print("Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED)
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 15000)
     {
         delay(500);
         Serial.print(".");
     }
-    Serial.println("\nWiFi connected");
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.println("\nWiFi connected");
+    }
+    else
+    {
+        Serial.println("\nWiFi connect timeout");
+    }
 }
 
 void connectMQTT()
 {
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    while (!mqttClient.connected())
+    while (!mqttClient.connected() && WiFi.status() == WL_CONNECTED)
     {
         if (mqttClient.connect("esp8266-client"))
         {
@@ -107,9 +120,8 @@ void performRollback()
 
     if (ret == HTTP_UPDATE_OK)
     {
-        Serial.println("[ROLLBACK] Rollback flashed OK. Marking success and rebooting...");
+        Serial.println("[ROLLBACK] Rollback flashed OK. Marking success.");
         eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ prevent rollback loop
-        ESP.restart();                     // 🔄 ensure reboot into rollback firmware
     }
     else
     {
@@ -209,23 +221,18 @@ void checkForUpdate()
 void setup()
 {
     Serial.begin(115200);
-    connectWiFi();
-    connectMQTT();
-    lastCheck = millis();
+    bootTime = millis();
 
     uint8_t bootFlag = eepromReadBootFlag();
     Serial.printf("Booting firmware version: %s (bootFlag=0x%02X)\n",
                   currentVersion.c_str(), bootFlag);
 
-    if (bootFlag == BOOT_FLAG_FAIL)
-    {
-        performRollback();
-    }
-    else
-    {
-        // Fresh boot is considered successful
-        eepromWriteBootFlag(BOOT_FLAG_OK);
-    }
+    connectWiFi();
+    connectMQTT();
+
+    // Mark success after reaching here
+    eepromWriteBootFlag(BOOT_FLAG_OK);
+    bootConfirmed = true;
 }
 
 void loop()
@@ -238,5 +245,16 @@ void loop()
 
     publishMetrics();
     checkForUpdate();
+
+    // Rollback check (only if boot never confirmed)
+    if (!bootConfirmed && (millis() - bootTime > 30000))
+    {
+        uint8_t bootFlag = eepromReadBootFlag();
+        if (bootFlag == BOOT_FLAG_FAIL)
+        {
+            performRollback();
+        }
+    }
+
     delay(5000);
 }
