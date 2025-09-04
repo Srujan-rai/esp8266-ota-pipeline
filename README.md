@@ -49,29 +49,6 @@ flowchart TD
 
 ```
 
-## Architecture
-
-```mermaid
-flowchart TD
-    subgraph Cloud [Cloud / CI-CD Pipeline]
-        A[GitHub Actions] -->|Builds Firmware| B[firmware.bin]
-        B -->|Deployed to| C[GitHub Pages]
-        D[ota.json Metadata] --> C
-    end
-
-    subgraph Device [ESP8266 Device]
-        E[ESP8266]
-        E -->|Fetch ota.json| C
-        E -->|Download new firmware| C
-        E -->|Validate Boot| F{Boot Success?}
-        F -- Yes --> G[Set Boot Flag OK]
-        F -- No --> H[Rollback: firmware-prev.bin from GitHub Pages]
-        E -->|Telemetry: uptime, heap, RSSI, version| I[MQTT Broker]
-    end
-
-    I[MQTT Broker] --> J[Monitoring / Dashboard]
-```
-
 ## Repository Structure
 
 ```
