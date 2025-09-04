@@ -28,24 +28,28 @@ It combines **CI/CD practices** with **rollback safety mechanisms** and **real-t
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Cloud [Cloud / CI-CD Pipeline]
-        A[GitHub Actions] -->|Builds Firmware| B[firmware.bin]
-        B -->|Deployed to| C[GitHub Pages]
-        D[ota.json Metadata] --> C
+flowchart LR
+    subgraph CI[CI/CD Pipeline]
+        A[GitHub Actions] --> B[Build Firmware<br/>firmware.bin]
+        A --> C[Generate Metadata<br/>ota.json]
+        B --> D[GitHub Pages]
+        C --> D
     end
 
-    subgraph Device [ESP8266 Device]
-        E[ESP8266]
-        E -->|Fetch ota.json| C
-        E -->|Download new firmware| C
-        E -->|Validate Boot| F{Boot Success?}
-        F -- Yes --> G[Set Boot Flag OK]
-        F -- No --> H[Rollback: firmware-prev.bin from GitHub Pages]
-        E -->|Telemetry: uptime, heap, RSSI, version| I[MQTT Broker]
+    subgraph Device[ESP8266 Device]
+        E[Check ota.json] --> F{New Version?}
+        F -- Yes --> G[Download firmware.bin<br/>via HTTPS]
+        G --> H[Boot Validation]
+        H -->|Success| I[Mark Boot Flag OK]
+        H -->|Failure| J[Rollback<br/>firmware-prev.bin]
+        E --> K[Publish Telemetry<br/>{uptime, heap, RSSI, fw_version}]
     end
 
-    I[MQTT Broker] --> J[Monitoring / Dashboard]
+    K --> L[MQTT Broker]
+    L --> M[Monitoring / Dashboard]
+
+    D -. OTA files .-> E
+
 
 ```
 
