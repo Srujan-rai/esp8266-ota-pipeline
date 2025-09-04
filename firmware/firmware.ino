@@ -11,16 +11,16 @@
 #define FW_VERSION "v1.0.0"
 #endif
 
-const char *WIFI_SSID = "Airtel_Srujan";
-const char *WIFI_PASS = "raisrujan@2003S";
+const char *WIFI_SSID = "WIFI SSID";
+const char *WIFI_PASS = "WIFI PASSWORD";
 
 const char *MQTT_BROKER = "192.168.1.5";
 const int MQTT_PORT = 1883;
 const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
 
-const char *OTA_META_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/ota.json";
-const char *ROLLBACK_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/firmware-prev.bin";
+const char *OTA_META_URL = "https://{github username}.github.io/esp8266-ota-pipeline/ota.json";
+const char *ROLLBACK_URL = "https://{github username}.github.io/esp8266-ota-pipeline/firmware-prev.bin";
 
 // ================= BOOT FLAG (EEPROM) =================
 #define EEPROM_SIZE 4
@@ -31,12 +31,12 @@ const char *ROLLBACK_URL = "https://srujan-rai.github.io/esp8266-ota-pipeline/fi
 
 String currentVersion = FW_VERSION;
 
-WiFiClientSecure secureClient; // HTTPS for OTA
-WiFiClient wifiClient;         // plain TCP for MQTT
+WiFiClientSecure secureClient;
+WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
 unsigned long lastCheck = 0;
-const unsigned long CHECK_INTERVAL = 60UL * 1000UL; // 1 min
+const unsigned long CHECK_INTERVAL = 60UL * 1000UL;
 unsigned long bootTime = 0;
 bool bootConfirmed = false;
 
@@ -121,14 +121,13 @@ void performRollback()
     if (ret == HTTP_UPDATE_OK)
     {
         Serial.println("[ROLLBACK] Rollback flashed OK. Marking success.");
-        eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ prevent rollback loop
+        eepromWriteBootFlag(BOOT_FLAG_OK);
     }
     else
     {
         int err = ESPhttpUpdate.getLastError();
         const String errStr = ESPhttpUpdate.getLastErrorString();
         Serial.printf("[ROLLBACK] Rollback failed (err=%d): %s\n", err, errStr.c_str());
-        // leave FAIL flag → will retry rollback next boot
         delay(3000);
     }
 }
@@ -192,7 +191,7 @@ void checkForUpdate()
     Serial.printf("New firmware %s found at %s\n", version, binUrl);
 
     secureClient.setInsecure();
-    eepromWriteBootFlag(BOOT_FLAG_FAIL); // mark fail BEFORE OTA
+    eepromWriteBootFlag(BOOT_FLAG_FAIL);
     t_httpUpdate_return ret = ESPhttpUpdate.update(secureClient, binUrl);
 
     switch (ret)
@@ -211,7 +210,7 @@ void checkForUpdate()
 
     case HTTP_UPDATE_OK:
         Serial.println("OTA OK -> rebooting...");
-        eepromWriteBootFlag(BOOT_FLAG_OK); // ✅ success
+        eepromWriteBootFlag(BOOT_FLAG_OK);
         mqttClient.publish(MQTT_OTA, "{\"ota_status\":1}");
         break;
     }
@@ -230,7 +229,6 @@ void setup()
     connectWiFi();
     connectMQTT();
 
-    // Mark success after reaching here
     eepromWriteBootFlag(BOOT_FLAG_OK);
     bootConfirmed = true;
 }

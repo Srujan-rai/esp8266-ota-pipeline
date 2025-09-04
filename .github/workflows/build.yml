@@ -44,11 +44,9 @@ jobs:
           VERSION="${{ github.run_number }}"
           mkdir -p ota
 
-          # Fetch existing gh-pages contents into a temp dir
           git fetch origin gh-pages || true
           git worktree add gh-pages-dir origin/gh-pages || true
 
-          # If old firmware-latest exists, move it to ota/firmware-prev.bin
           if [ -f gh-pages-dir/firmware-latest.bin ]; then
             cp gh-pages-dir/firmware-latest.bin ota/firmware-prev.bin
             echo "Previous firmware saved as firmware-prev.bin"
@@ -56,10 +54,8 @@ jobs:
             echo "No previous firmware found, skipping rollback copy"
           fi
 
-          # Copy new build as latest
           cp build/firmware.ino.bin ota/firmware-latest.bin
 
-          # Update metadata
           echo "{ \"version\": \"$VERSION\", \"url\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/firmware-latest.bin\" }" > ota/ota.json
 
       - name: Deploy to GitHub Pages
