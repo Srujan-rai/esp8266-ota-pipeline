@@ -14,13 +14,13 @@
 const char *WIFI_SSID = "WIFI SSID";
 const char *WIFI_PASS = "WIFI PASSWORD";
 
-const char *MQTT_BROKER = "192.168.1.5";
+const char *MQTT_BROKER = "MQTT BROKER ADDRESS";
 const int MQTT_PORT = 1883;
 const char *MQTT_TOPIC = "esp8266/metrics";
 const char *MQTT_OTA = "esp8266/ota";
 
-const char *OTA_META_URL = "https://{github username}.github.io/esp8266-ota-pipeline/ota.json";
-const char *ROLLBACK_URL = "https://{github username}.github.io/esp8266-ota-pipeline/firmware-prev.bin";
+const char *OTA_META_URL = "https://{github-username}.github.io/esp8266-ota-pipeline/ota.json";
+const char *ROLLBACK_URL = "https://{github-username}.github.io/esp8266-ota-pipeline/firmware-prev.bin";
 
 // ================= BOOT FLAG (EEPROM) =================
 #define EEPROM_SIZE 4
