@@ -30,26 +30,25 @@ It combines **CI/CD practices** with **rollback safety mechanisms** and **real-t
 ```mermaid
 flowchart LR
     subgraph CI[CI/CD Pipeline]
-        A[GitHub Actions] --> B[Build Firmware<br/>firmware.bin]
-        A --> C[Generate Metadata<br/>ota.json]
+        A[GitHub Actions] --> B[Build Firmware: firmware.bin]
+        A --> C[Generate Metadata: ota.json]
         B --> D[GitHub Pages]
         C --> D
     end
 
     subgraph Device[ESP8266 Device]
-        E[Check ota.json] --> F{New Version?}
-        F -- Yes --> G[Download firmware.bin<br/>via HTTPS]
+        E[Fetch ota.json] --> F{New Version Available?}
+        F -- Yes --> G[Download firmware.bin (HTTPS)]
         G --> H[Boot Validation]
-        H -->|Success| I[Mark Boot Flag OK]
-        H -->|Failure| J[Rollback<br/>firmware-prev.bin]
-        E --> K[Publish Telemetry<br/>{uptime, heap, RSSI, fw_version}]
+        H -- Success --> I[Set Boot Flag OK]
+        H -- Failure --> J[Rollback to firmware-prev.bin]
+        E --> K[Publish Telemetry: uptime, heap, RSSI, version]
     end
 
     K --> L[MQTT Broker]
     L --> M[Monitoring / Dashboard]
 
-    D -. OTA files .-> E
-
+    D -. Provides OTA files .-> E
 
 ```
 
