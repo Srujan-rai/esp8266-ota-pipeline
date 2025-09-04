@@ -49,39 +49,6 @@ flowchart TD
 
 ```
 
-Understood ✅
-Here’s a **professional, well-structured `README.md`** draft for your repository. It’s written in clean technical English, with no emojis, no fluff, and focused on clarity.
-
----
-
-````markdown
-# ESP8266 OTA Pipeline with Rollback and MQTT Telemetry
-
-This project demonstrates a DevOps-inspired pipeline for **safe Over-The-Air (OTA) firmware updates** on ESP8266 devices.  
-It combines **CI/CD practices** with **rollback safety mechanisms** and **real-time telemetry reporting** over MQTT.
-
----
-
-## Features
-
-- **Automatic OTA Delivery**  
-  New firmware is built via GitHub Actions and deployed to GitHub Pages for distribution.
-
-- **Firmware Rollback**  
-  If an update fails to boot, the ESP8266 automatically rolls back to the previous firmware version.
-
-- **Boot Validation**  
-  Each firmware version is validated at startup before being marked as stable.
-
-- **MQTT Telemetry**  
-  Device health metrics are published periodically:
-  - Uptime
-  - Free heap memory
-  - Wi-Fi RSSI
-  - Running firmware version
-
----
-
 ## Architecture
 
 ```mermaid
@@ -104,9 +71,6 @@ flowchart TD
 
     I[MQTT Broker] --> J[Monitoring / Dashboard]
 ```
-````
-
----
 
 ## Repository Structure
 
@@ -197,3 +161,7 @@ You can propose improvements to:
 ## License
 
 This project is licensed under the MIT License.
+
+```
+
+```
