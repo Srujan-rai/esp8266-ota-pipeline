@@ -246,7 +246,6 @@ void loop()
     publishMetrics();
     checkForUpdate();
 
-    // Rollback check (only if boot never confirmed)
     if (!bootConfirmed && (millis() - bootTime > 30000))
     {
         uint8_t bootFlag = eepromReadBootFlag();
