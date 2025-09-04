@@ -142,7 +142,3 @@ You can propose improvements to:
 ## License
 
 This project is licensed under the MIT License.
-
-```
-
-```
